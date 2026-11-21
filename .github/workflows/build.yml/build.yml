@@ -1,0 +1,193 @@
+
+name: Build DotImage APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android App
+        run: flutter create --org com.dotbhai dotimage_app
+
+      - name: Configure App
+        working-directory: dotimage_app
+        run: |
+          cat > pubspec.yaml <<'EOF'
+          name: dotimage
+          description: DotImage AI Image App
+          publish_to: none
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.3.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            http: ^1.2.2
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^4.0.0
+          flutter:
+            uses-material-design: true
+          EOF
+
+          cat > lib/main.dart <<'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:http/http.dart' as http;
+          import 'dart:convert';
+
+          void main() => runApp(const DotImage());
+
+          class DotImage extends StatelessWidget {
+            const DotImage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'DotImage',
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  colorSchemeSeed: Colors.deepPurple,
+                  useMaterial3: true,
+                ),
+                home: const HomePage(),
+              );
+            }
+          }
+
+          class HomePage extends StatefulWidget {
+            const HomePage({super.key});
+
+            @override
+            State<HomePage> createState() => _HomePageState();
+          }
+
+          class _HomePageState extends State<HomePage> {
+            final prompt = TextEditingController();
+            final server = TextEditingController();
+            String status = 'اكتب وصف الصورة التي تريد إنشاءها';
+            bool loading = false;
+
+            Future<void> generate() async {
+              if (server.text.trim().isEmpty ||
+                  prompt.text.trim().isEmpty) {
+                setState(() => status = 'أدخل رابط الخادم ووصف الصورة');
+                return;
+              }
+
+              setState(() {
+                loading = true;
+                status = 'جارٍ الاتصال بالخادم...';
+              });
+
+              try {
+                final response = await http.post(
+                  Uri.parse('${server.text.trim()}/generate'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({'prompt': prompt.text.trim()}),
+                ).timeout(const Duration(seconds: 90));
+
+                setState(() {
+                  status = response.statusCode == 200
+                      ? 'تم إرسال الطلب بنجاح'
+                      : 'خطأ من الخادم: ${response.statusCode}';
+                });
+              } catch (e) {
+                setState(() => status = 'تعذر الاتصال: $e');
+              } finally {
+                setState(() => loading = false);
+              }
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('DotImage AI'),
+                  centerTitle: true,
+                ),
+                body: ListView(
+                  padding: const EdgeInsets.all(22),
+                  children: [
+                    const Icon(Icons.auto_awesome,
+                        size: 85, color: Colors.deepPurpleAccent),
+                    const SizedBox(height: 15),
+                    const Text(
+                      'اصنع صورك بالذكاء الاصطناعي',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 23,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    TextField(
+                      controller: server,
+                      decoration: const InputDecoration(
+                        labelText: 'رابط خادم API',
+                        hintText: 'https://your-server.com',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: prompt,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'وصف الصورة',
+                        hintText: 'اكتب وصف الصورة هنا...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    FilledButton.icon(
+                      onPressed: loading ? null : generate,
+                      icon: const Icon(Icons.image),
+                      label: Text(loading
+                          ? 'جارٍ التنفيذ...'
+                          : 'إنشاء صورة'),
+                    ),
+                    const SizedBox(height: 25),
+                    Center(
+                      child: Text(
+                        status,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+          EOF
+
+          sed -i '/<application/i\
+              <uses-permission android:name="android.permission.INTERNET" />' \
+              android/app/src/main/AndroidManifest.xml
+
+          flutter pub get
+
+      - name: Build APK
+        working-directory: dotimage_app
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DotImage-APK
+          path: dotimage_app/build/app/outputs/flutter-apk/app-release.apk
+          
