@@ -1,0 +1,116 @@
+
+name: Build DotImage APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create DotImage project
+        run: flutter create --org com.dotbhai --project-name dotimage --platforms android dotimage_app
+
+      - name: Add DotImage interface
+        working-directory: dotimage_app
+        run: |
+          cat > lib/main.dart <<'EOF'
+          import 'package:flutter/material.dart';
+
+          void main() => runApp(const DotImage());
+
+          class DotImage extends StatelessWidget {
+            const DotImage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                title: 'DotImage',
+                theme: ThemeData(
+                  brightness: Brightness.dark,
+                  colorSchemeSeed: Colors.deepPurple,
+                  useMaterial3: true,
+                ),
+                home: const HomePage(),
+              );
+            }
+          }
+
+          class HomePage extends StatelessWidget {
+            const HomePage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('DotImage AI'),
+                    centerTitle: true,
+                  ),
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome,
+                            size: 100,
+                            color: Colors.deepPurpleAccent,
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'مرحباً بك في DotImage',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'أنشئ وعدّل صورك بالذكاء الاصطناعي',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 30),
+                          FilledButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(Icons.image),
+                            label: const Text('إنشاء صورة'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+      - name: Build release APK
+        working-directory: dotimage_app
+        run: flutter build apk --release
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DotImage-APK
+          path: dotimage_app/build/app/outputs/flutter-apk/app-release.apk
+          
