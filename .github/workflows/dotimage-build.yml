@@ -25,7 +25,7 @@ jobs:
 
       - name: Extract mobile project
         run: |
-          unzip -q mobile.zip -d extracted
+          unzip -q mobile-fixed.zip-d extracted
           PUBSPEC=$(find extracted -name pubspec.yaml -print -quit)
           if [ -z "$PUBSPEC" ]; then
             echo "pubspec.yaml not found"
