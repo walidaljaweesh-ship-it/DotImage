@@ -34,13 +34,36 @@ jobs:
           PROJECT_DIR=$(dirname "$PUBSPEC")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Prepare Android project
-        working-directory: .
+      - name: Set and verify Cloudflare API URL
         run: |
           cd "$PROJECT_DIR"
-          
-          sed -i 's|http://10.0.2.2:3000|https://image-ai-server.almhmdq251.workers.dev|g; s|image.ai-server|image-ai-server|g; s|image-ai-server.almhmdg251.workers.dev|image-ai-server.almhmdq251.workers.dev|g' lib/main.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
+          path = Path("lib/main.dart")
+          source = path.read_text()
+          fixed = "const String apiBaseUrl = 'https://image-ai-server.almhmdq251.workers.dev';"
+          source, count = re.subn(
+              r"(?m)^const String apiBaseUrl\s*=\s*[^;]+;",
+              fixed,
+              source,
+          )
+          if count != 1:
+              raise SystemExit(f"Expected exactly one apiBaseUrl declaration; found {count}")
+          path.write_text(source)
+
+          check = path.read_text()
+          if fixed not in check:
+              raise SystemExit("Cloudflare API URL verification failed")
+          if "image.ai-server" in check or "image-ai-server.almhmdg251.workers.dev" in check:
+              raise SystemExit("An incorrect API hostname remains in lib/main.dart")
+          print("Verified API base URL:", fixed)
+          PY
+
+      - name: Prepare Android project
+        run: |
+          cd "$PROJECT_DIR"
           flutter create --platforms android --org com.dotbhai --project-name dotimage .
           flutter pub get
 
