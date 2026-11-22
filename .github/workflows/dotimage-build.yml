@@ -38,6 +38,7 @@ jobs:
         working-directory: .
         run: |
           cd "$PROJECT_DIR"
+          sed -i 's|http://10.0.2.2:3000|https://image-ai-server.almhmdq251.workers.dev|g' lib/main.dart
           flutter create --platforms android --org com.dotbhai --project-name dotimage .
           flutter pub get
 
